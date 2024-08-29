@@ -7,21 +7,26 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.fsm.storage.memory import MemoryStorage
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # URL для парсинга
-url = 'https://airdrops.io/'
+URL = os.getenv('URL')
+TOKEN = os.getenv('TOKEN')
 
 # Максимальная длина сообщения
 MAX_MESSAGE_LENGTH = 4096
 
 # Асинхронный запрос к URL и парсинг с помощью BeautifulSoup
-async def fetch_page(session, url):
-    async with session.get(url) as response:
+async def fetch_page(session, URL):
+    async with session.get(URL) as response:
         return await response.text()
 
 async def parse_info():
     async with aiohttp.ClientSession() as session:
-        response_text = await fetch_page(session, url)
+        response_text = await fetch_page(session, URL)
         soup = BeautifulSoup(response_text, 'lxml')
 
         all_info = ''
@@ -51,7 +56,7 @@ async def parse_info():
 logging.basicConfig(level=logging.INFO)
 
 # Создаем объект бота
-bot = Bot(token="7164929735:AAHodDuQlOy4zO8ttfXB4zQffhum_LKio5A")
+bot = Bot(token=TOKEN)
 
 # Создаем диспетчер с использованием MemoryStorage
 dp = Dispatcher(storage=MemoryStorage())
@@ -82,5 +87,5 @@ async def cmd_info(message: Message):
 async def main():
     await dp.start_polling(bot)
 
-if name == "main":
+if __name__ == "__main__":
     asyncio.run(main())
