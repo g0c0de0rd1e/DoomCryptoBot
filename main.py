@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
+import io
 
 load_dotenv()
 
@@ -29,17 +30,21 @@ async def parse_info():
         response_text = await fetch_page(session, URL)
         soup = BeautifulSoup(response_text, 'lxml')
 
-        all_info = ''
-        links = []
+        drops = []
         
         # Сбор всех ссылок на страницы airdrops
         for quote in soup.find_all('div', class_='air-content-front'):
             link = quote.find('a')
             if link:
-                links.append(link.get('href'))
+                drops.append(link.get('href'))
 
+        # Перемешивание списка ссылок
+        random.shuffle(drops)
+
+        all_info = io.StringIO()
+        
         # Переход по каждой ссылке и парсинг информации
-        for link in links:
+        for link in drops:
             response_text = await fetch_page(session, link)
             page_soup = BeautifulSoup(response_text, 'lxml')
             
@@ -48,9 +53,9 @@ async def parse_info():
             lin = page_soup.find('a', class_='claim-airdrop button outline')
             lin_href = lin.get('href') if lin else 'No link found'
 
-            all_info += f"Title: {title}\nInfo: {inf}\nLink: {lin_href}\n\n"
+            all_info.write(f"Title: {title}\nInfo: {inf}\nLink: <a href='{lin_href}'>{lin_href}</a>\n\n")
 
-        return all_info
+        return all_info.getvalue()
 
 # Включаем логирование
 logging.basicConfig(level=logging.INFO)
@@ -79,7 +84,7 @@ async def cmd_info(message: Message):
     all_info = await parse_info()
     if all_info:
         for i in range(0, len(all_info), MAX_MESSAGE_LENGTH):
-            await message.answer(all_info[i:i + MAX_MESSAGE_LENGTH])
+            await message.answer(all_info[i:i + MAX_MESSAGE_LENGTH], parse_mode='HTML')
     else:
         await message.answer("Информация не найдена.")
 
