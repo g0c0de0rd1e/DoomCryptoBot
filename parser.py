@@ -4,6 +4,8 @@ import random
 import io
 import os
 from dotenv import load_dotenv
+from googletrans import Translator
+from translations import translations  # Импортируем переводы
 
 load_dotenv()
 
@@ -15,7 +17,7 @@ async def fetch_page(session, URL):
     async with session.get(URL) as response:
         return await response.text()
 
-async def parse_info():
+async def parse_info(language='en'):
     async with aiohttp.ClientSession() as session:
         response_text = await fetch_page(session, URL)
         soup = BeautifulSoup(response_text, 'lxml')
@@ -31,7 +33,8 @@ async def parse_info():
         # Перемешивание списка ссылок
         random.shuffle(drops)
 
-        all_info = io.StringIO()
+        all_info = []
+        translator = Translator()
         
         # Переход по каждой ссылке и парсинг информации
         for link in drops:
@@ -43,6 +46,14 @@ async def parse_info():
             lin = page_soup.find('a', class_='claim-airdrop button outline')
             lin_href = lin.get('href') if lin else 'No link found'
 
-            all_info.write(f"Title: {title}\nInfo: {inf}\nLink: <a href='{lin_href}'>{lin_href}</a>\n\n")
+            if language == 'ru':
+                title = translator.translate(title, dest='ru').text
+                inf = translator.translate(inf, dest='ru').text if inf else 'Информация не найдена'
 
-        return all_info.getvalue()
+            # Проверка на наличие ключа 'all-translations'
+            translated_parts = translator.translate(inf, dest='ru').extra_data.get('all-translations', [])
+            inf = ' '.join(part.text.strip() for part in translated_parts if part and part.text is not None)
+
+            all_info.append(f"{translations['title'][language]}: {title}\n{translations['info'][language]}: {inf}\n{translations['link'][language]}: <a href='{lin_href}'>{lin_href}</a>")
+
+        return all_info
