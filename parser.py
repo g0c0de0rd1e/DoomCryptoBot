@@ -1,11 +1,12 @@
 import aiohttp
 from bs4 import BeautifulSoup
 import random
-import io
+import asyncio
 import os
 from dotenv import load_dotenv
 from googletrans import Translator
 from translations import translations  # Импортируем переводы
+import logging
 
 load_dotenv()
 
@@ -13,9 +14,16 @@ load_dotenv()
 URL = os.getenv('URL')
 
 # Асинхронный запрос к URL и парсинг с помощью BeautifulSoup
-async def fetch_page(session, URL):
-    async with session.get(URL) as response:
-        return await response.text()
+async def fetch_page(session, URL, retries=3, timeout=None):
+    for _ in range(retries):
+        try:
+            async with session.get(URL, timeout=timeout) as response:
+                return await response.text()
+        except aiohttp.ClientError as e:
+            print(f"Request failed: {e}")
+        except asyncio.TimeoutError:
+            print("Request timed out")
+    return None
 
 async def parse_info(language='en'):
     async with aiohttp.ClientSession() as session:
@@ -36,8 +44,9 @@ async def parse_info(language='en'):
         all_info = []
         translator = Translator()
         
-        # Переход по каждой ссылке и парсинг информации
-        for link in drops:
+        # Переход по одной случайной ссылке и парсинг информации
+        if drops:
+            link = random.choice(drops)
             response_text = await fetch_page(session, link)
             page_soup = BeautifulSoup(response_text, 'lxml')
             
@@ -48,11 +57,17 @@ async def parse_info(language='en'):
 
             if language == 'ru':
                 title = translator.translate(title, dest='ru').text
-                inf = translator.translate(inf, dest='ru').text if inf else 'Информация не найдена'
-
-            # Проверка на наличие ключа 'all-translations'
-            translated_parts = translator.translate(inf, dest='ru').extra_data.get('all-translations', [])
-            inf = ' '.join(part.text.strip() for part in translated_parts if part and part.text is not None)
+                
+                # Разбиваем текст на абзацы
+                paragraphs = inf.split('\n')
+                translated_paragraphs = []
+                
+                for paragraph in paragraphs:
+                    if paragraph.strip():  # Пропускаем пустые абзацы
+                        translated_paragraph = translator.translate(paragraph, dest='ru').text
+                        translated_paragraphs.append(translated_paragraph)
+                
+                inf = '\n'.join([p for p in translated_paragraphs if p is not None])
 
             all_info.append(f"{translations['title'][language]}: {title}\n{translations['info'][language]}: {inf}\n{translations['link'][language]}: <a href='{lin_href}'>{lin_href}</a>")
 
