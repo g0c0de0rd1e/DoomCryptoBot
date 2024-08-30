@@ -6,7 +6,6 @@ import os
 from dotenv import load_dotenv
 from googletrans import Translator
 from translations import translations  # Импортируем переводы
-import logging
 
 load_dotenv()
 
